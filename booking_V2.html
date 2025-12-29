@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>精算獅 - 寵物美容預約 App</title>
+    
+    <!-- 1. 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. 載入 React 核心 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 3. 載入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: #1f2937; 
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            height: 100dvh; 
+            overflow: hidden; 
+        }
+
+        .mobile-frame {
+            width: 100%;
+            max-width: 430px; 
+            background-color: #f3f4f6;
+            height: 100%; 
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .page-enter { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .timeline-line {
+            position: absolute;
+            left: 24px;
+            top: 20px;
+            bottom: 20px;
+            width: 2px;
+            background-color: #e5e7eb;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="mobile-frame"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const Icon = ({ children, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+
+        const Icons = {
+            Home: <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>,
+            User: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+            Calendar: <><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>,
+            Plus: <><path d="M5 12h14"/><path d="M12 5v14"/></>,
+            ChevronLeft: <path d="m15 18-6-6 6-6"/>,
+            ChevronRight: <path d="m9 18 6-6-6-6"/>,
+            Check: <polyline points="20 6 9 17 4 12"/>,
+            Clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+            Scissors: <><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></>,
+            MapPin: <><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>,
+            Bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></>,
+            X: <><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>,
+            Info: <><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/></>,
+            List: <><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></>,
+            Wallet: <><rect width="20" height="14" x="2" y="5" rx="2" /><line x1="2" x2="22" y1="10" y2="10" /></>,
+            Ticket: <><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></>,
+            LogOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></>,
+            Edit: <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>,
+            Phone: <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>,
+            Trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>
+        };
+
+        const USER = { name: "林先生", points: 1250, balance: 3500, coupons: 3, level: "黃金獅友", nextLevel: 2000 };
+        
+        const MY_PETS = [
+            { id: 1, name: "可樂", breed: "紅貴賓", gender: "公", birthday: "2020-05-20", color: "bg-red-100 text-red-500", lastVisit: "2023/11/20" },
+            { id: 2, name: "麻糬", breed: "馬爾濟斯", gender: "母", birthday: "2021-08-15", color: "bg-gray-100 text-gray-500", lastVisit: "2023/10/05" },
+            { id: 3, name: "Mimi", breed: "美國短毛貓", gender: "母", birthday: "2019-02-10", color: "bg-blue-100 text-blue-500", lastVisit: "2023/09/15" },
+            { id: 4, name: "巧克力", breed: "黃金獵犬", gender: "公", birthday: "2022-11-30", color: "bg-yellow-100 text-yellow-600", lastVisit: "2023/08/20" }
+        ];
+
+        const SERVICES = [
+            { id: 'bath', name: "精緻洗澡", price: 800, duration: "1.5 hr", desc: "包含洗澡、剪指甲、清耳朵、擠肛門腺", icon: "🚿" },
+            { id: 'groom', name: "大美容", price: 1500, duration: "3 hr", desc: "包含全身造型修剪 + 精緻洗澡全套", icon: "✂️" },
+            { id: 'spa', name: "深層 SPA", price: 1200, duration: "2 hr", desc: "碳酸泉藥浴，改善皮膚問題", icon: "🛁" }
+        ];
+        const TIME_SLOTS = ["10:00", "11:30", "13:00", "14:30", "16:00", "17:30"];
+
+        // 1. 首頁 (日曆視圖)
+        const HomeScreen = ({ onDateSelect }) => {
+            const SIMULATED_TODAY = new Date(2025, 11, 29);
+            const [currentDate, setCurrentDate] = useState(new Date(2025, 11, 1));
+
+            const changeMonth = (offset) => {
+                setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1));
+            };
+
+            const calendarData = useMemo(() => {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const firstDayOfWeek = new Date(year, month, 1).getDay();
+
+                const days = [];
+                for (let i = 0; i < firstDayOfWeek; i++) days.push(null);
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateObj = new Date(year, month, d);
+                    const dayOfWeek = dateObj.getDay();
+                    let status = 'free'; 
+                    let isPast = false;
+                    let isToday = false;
+                    const compareDate = dateObj.setHours(0,0,0,0);
+                    const todayDate = SIMULATED_TODAY.setHours(0,0,0,0);
+
+                    if (compareDate < todayDate) { isPast = true; status = 'past'; }
+                    else if (compareDate === todayDate) { isToday = true; status = 'free'; }
+                    else {
+                        const randomSeed = (year * (month + 1) * d * 13) % 100;
+                        if (randomSeed < 20) status = 'full'; 
+                        else if (randomSeed < 50) status = 'busy'; 
+                        else status = 'free'; 
+                    }
+                    days.push({ d, status, w: ['日','一','二','三','四','五','六'][dayOfWeek], isPast, isToday });
+                }
+                return days;
+            }, [currentDate]);
+
+            return (
+                <div className="h-full flex flex-col page-enter bg-gray-50">
+                    <div className="flex-1 overflow-y-auto pb-24">
+                        <div className="bg-orange-500 text-white p-4 rounded-b-[32px] shadow-md sticky top-0 z-20">
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="flex items-center space-x-2">
+                                    <div className="bg-white/20 p-1.5 rounded-full"><Icon size={20}>{Icons.User}</Icon></div>
+                                    <span className="font-bold text-sm">Hi, {USER.name}</span>
+                                </div>
+                                <div className="relative"><Icon size={20}>{Icons.Bell}</Icon><div className="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full border border-orange-500"></div></div>
+                            </div>
+                            <div className="flex justify-between items-end">
+                                <div><h1 className="text-xl font-black">預約美容</h1><p className="text-orange-100 text-xs opacity-90 mt-0.5">點選日期查看時段</p></div>
+                                <div className="bg-white/20 px-2 py-1 rounded-lg flex items-center space-x-1 text-xs font-bold mb-1"><span>🦁</span><span className="text-yellow-300">{USER.points} P</span></div>
+                            </div>
+                        </div>
+
+                        <div className="px-4 mt-4">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-black text-gray-800">{currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月</h2>
+                                <div className="flex space-x-1">
+                                    <button onClick={() => changeMonth(-1)} className="p-1.5 bg-white rounded-lg shadow-sm text-gray-800 hover:bg-gray-50 active:scale-95"><Icon size={16}>{Icons.ChevronLeft}</Icon></button>
+                                    <button onClick={() => changeMonth(1)} className="p-1.5 bg-white rounded-lg shadow-sm text-gray-800 hover:bg-gray-50 active:scale-95"><Icon size={16}>{Icons.ChevronRight}</Icon></button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-y-1 gap-x-1 mb-6 text-center">
+                                {['日','一','二','三','四','五','六'].map(d => <div key={d} className="text-xs font-bold text-gray-400 mb-1">{d}</div>)}
+                                {calendarData.map((day, idx) => {
+                                    if (!day) return <div key={`empty-${idx}`}></div>;
+                                    let statusColor = 'bg-gray-200'; 
+                                    if (!day.isPast) {
+                                        if (day.status === 'full') statusColor = 'bg-red-500';
+                                        else if (day.status === 'busy') statusColor = 'bg-orange-400';
+                                        else statusColor = 'bg-green-400';
+                                    }
+                                    return (
+                                        <div key={idx} className="flex flex-col items-center">
+                                            <button onClick={() => !day.isPast && day.status !== 'full' && onDateSelect({...day, m: currentDate.getMonth() + 1})} disabled={day.isPast || day.status === 'full'} className={`w-full aspect-[4/5] max-w-[44px] rounded-xl flex flex-col items-center justify-center relative transition-all ${day.isToday ? 'bg-blue-50 border border-blue-500 shadow-sm' : day.isPast ? 'bg-transparent cursor-not-allowed opacity-30' : day.status === 'full' ? 'bg-gray-50 opacity-60 cursor-not-allowed' : 'bg-white shadow-sm border border-transparent hover:border-orange-500 active:scale-95'}`}>
+                                                <span className={`text-sm font-bold ${day.isToday ? 'text-blue-600' : day.isPast ? 'text-gray-300' : day.status === 'full' ? 'text-gray-400' : 'text-gray-800'}`}>{day.d}</span>
+                                                {!day.isPast && <div className={`mt-1 w-1.5 h-1.5 rounded-full ${statusColor}`}></div>}
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex justify-center space-x-4 mb-6 text-[10px] font-bold text-gray-500 bg-white/50 py-2 rounded-xl">
+                                <div className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5"></div>可預約</div>
+                                <div className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-1.5"></div>即將滿</div>
+                                <div className="flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></div>已額滿</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. 選擇時間 (時間軸優化版)
+        const SelectTimeScreen = ({ date, onNext, onBack, onClose }) => {
+            const [selectedTime, setSelectedTime] = useState(null);
+            
+            // 模擬隨機產能狀態 (為了演示用)
+            const timeSlots = useMemo(() => {
+                return TIME_SLOTS.map((time, idx) => {
+                    // 根據日期和時間隨機產生狀態
+                    const seed = (date.d * (idx + 1)) % 10;
+                    let status = 'free'; // 'free', 'busy', 'full'
+                    if (seed > 8) status = 'full';
+                    else if (seed > 6) status = 'busy';
+                    
+                    return { time, status };
+                });
+            }, [date]);
+
+            if (!date) return null;
+
+            return (
+                <div className="flex flex-col h-full bg-gray-50 page-enter">
+                    <div className="p-4 pt-8 flex justify-between items-center flex-shrink-0 bg-white shadow-sm z-10">
+                        <div className="flex items-center">
+                            <button onClick={onBack} className="p-2 bg-gray-100 rounded-xl mr-3"><Icon>{Icons.ChevronLeft}</Icon></button>
+                            <div>
+                                <h2 className="text-lg font-black">選擇時段</h2>
+                                <p className="text-xs text-gray-500 font-bold">{date.m}/{date.d} ({date.w})</p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-gray-100 text-gray-500 rounded-full"><Icon size={20}>{Icons.X}</Icon></button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto pt-6 px-6 pb-24 relative">
+                        {/* 垂直時間軸線 */}
+                        <div className="timeline-line"></div>
+
+                        {timeSlots.map((slot, idx) => (
+                            <div key={slot.time} className="flex mb-6 relative z-10">
+                                {/* 左側時間 */}
+                                <div className="w-12 text-right pt-2 mr-6 text-sm font-bold text-gray-500">{slot.time}</div>
+                                
+                                {/* 右側卡片 */}
+                                <div className="flex-1">
+                                    <button 
+                                        disabled={slot.status === 'full'}
+                                        onClick={() => setSelectedTime(slot.time)}
+                                        className={`w-full p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${
+                                            slot.status === 'full' 
+                                            ? 'bg-gray-100 border-transparent opacity-60 cursor-not-allowed' 
+                                            : selectedTime === slot.time 
+                                                ? 'bg-orange-50 border-orange-500 shadow-md ring-1 ring-orange-200' 
+                                                : 'bg-white border-transparent shadow-sm hover:border-gray-200'
+                                        }`}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <span className={`text-sm font-black ${
+                                                    slot.status === 'full' ? 'text-gray-400' : 'text-gray-800'
+                                                }`}>
+                                                    {slot.status === 'full' ? '已額滿' : slot.status === 'busy' ? '即將額滿' : '開放預約'}
+                                                </span>
+                                                <p className="text-xs text-gray-400 mt-0.5">
+                                                    {slot.status === 'full' ? '請選擇其他時段' : slot.status === 'busy' ? '剩餘 1 個名額' : '名額充足'}
+                                                </p>
+                                            </div>
+                                            
+                                            {/* 狀態燈號或勾勾 */}
+                                            {selectedTime === slot.time ? (
+                                                <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-sm">
+                                                    <Icon size={14}>{Icons.Check}</Icon>
+                                                </div>
+                                            ) : (
+                                                <div className={`w-3 h-3 rounded-full ${
+                                                    slot.status === 'full' ? 'bg-red-500' : 
+                                                    slot.status === 'busy' ? 'bg-orange-400' : 'bg-green-400'
+                                                }`}></div>
+                                            )}
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="p-4 bg-white border-t border-gray-100 pb-8 sticky bottom-0 z-20">
+                        <button disabled={!selectedTime} onClick={() => onNext({ time: selectedTime })} className={`w-full py-3 rounded-xl font-bold text-lg transition-colors ${selectedTime ? 'bg-orange-500 text-white shadow-lg' : 'bg-gray-200 text-gray-400'}`}>下一步：選擇寵物</button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. 選擇寵物
+        const SelectPetScreen = ({ onNext, onBack, onClose }) => {
+            const [selectedId, setSelectedId] = useState(null);
+            return (
+                <div className="flex flex-col h-full bg-gray-50 page-enter">
+                    <div className="p-4 pt-8 flex justify-between items-center flex-shrink-0 bg-white shadow-sm z-10">
+                        <div className="flex items-center">
+                            <button onClick={onBack} className="p-2 bg-gray-100 rounded-xl mr-3"><Icon>{Icons.ChevronLeft}</Icon></button>
+                            <h2 className="text-lg font-black">選擇寵物</h2>
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-gray-100 text-gray-500 rounded-full"><Icon size={20}>{Icons.X}</Icon></button>
+                    </div>
+                    <div className="flex-1 px-4 space-y-3 overflow-y-auto pb-4 pt-6">
+                        {MY_PETS.map(pet => (
+                            <div key={pet.id} onClick={() => setSelectedId(pet.id)} className={`p-3 rounded-2xl border transition-all flex items-center space-x-3 ${selectedId === pet.id ? 'border-orange-500 bg-orange-50 shadow-md' : 'border-transparent bg-white shadow-sm'}`}>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-black ${pet.color}`}>
+                                    {pet.name[0]}
+                                </div>
+                                <div className="flex-1"><h3 className="text-base font-bold">{pet.name}</h3><p className="text-xs text-gray-500">{pet.breed}</p></div>
+                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedId === pet.id ? 'bg-orange-500 border-orange-500' : 'border-gray-300'}`}>{selectedId === pet.id && <span className="text-white"><Icon size={12}>{Icons.Check}</Icon></span>}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="p-4 bg-white border-t border-gray-100 pb-8">
+                        <button disabled={!selectedId} onClick={() => onNext({ pet: MY_PETS.find(p => p.id === selectedId) })} className={`w-full py-3 rounded-xl font-bold text-lg transition-colors ${selectedId ? 'bg-orange-500 text-white shadow-lg' : 'bg-gray-200 text-gray-400'}`}>下一步：選擇服務</button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 4. 選擇服務
+        const SelectServiceScreen = ({ onNext, onBack, onClose }) => {
+            const [selectedId, setSelectedId] = useState(null);
+            return (
+                <div className="flex flex-col h-full bg-gray-50 page-enter">
+                    <div className="p-4 pt-8 flex justify-between items-center flex-shrink-0 bg-white shadow-sm z-10">
+                        <div className="flex items-center">
+                            <button onClick={onBack} className="p-2 bg-gray-100 rounded-xl mr-3"><Icon>{Icons.ChevronLeft}</Icon></button>
+                            <h2 className="text-lg font-black">選擇服務</h2>
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-gray-100 text-gray-500 rounded-full"><Icon size={20}>{Icons.X}</Icon></button>
+                    </div>
+                    <div className="flex-1 px-4 space-y-3 overflow-y-auto pb-4 pt-6">
+                        {SERVICES.map(svc => (
+                            <div key={svc.id} onClick={() => setSelectedId(svc.id)} className={`p-4 rounded-2xl border transition-all ${selectedId === svc.id ? 'border-orange-500 bg-white shadow-lg ring-1 ring-orange-100' : 'border-transparent bg-white shadow-sm'}`}>
+                                <div className="flex justify-between items-start mb-1"><div className="bg-gray-100 w-10 h-10 rounded-xl flex items-center justify-center text-xl">{svc.icon}</div><span className="font-black text-base text-gray-900">${svc.price}</span></div>
+                                <h3 className="font-bold text-gray-800 text-base mb-1">{svc.name}</h3><p className="text-xs text-gray-500 mb-2">{svc.desc}</p>
+                                <div className="inline-flex items-center text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-lg"><span className="mr-1"><Icon size={10}>{Icons.Clock}</Icon></span> {svc.duration}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="p-4 bg-white border-t border-gray-100 pb-8">
+                        <button disabled={!selectedId} onClick={() => onNext({ service: SERVICES.find(s => s.id === selectedId) })} className={`w-full py-3 rounded-xl font-bold text-lg transition-colors ${selectedId ? 'bg-orange-500 text-white shadow-lg' : 'bg-gray-200 text-gray-400'}`}>確認預約</button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. 成功頁面
+        const SuccessScreen = ({ onFinish, bookingData }) => (
+            <div className="flex flex-col h-full bg-green-500 items-center justify-center p-8 page-enter text-white">
+                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mb-4 animate-bounce"><Icon size={40}>{Icons.Check}</Icon></div>
+                <h2 className="text-2xl font-black mb-1">預約成功！</h2>
+                <p className="text-white/80 text-sm font-bold mb-8 text-center">您的預約已送出，<br/>請留意 Line 通知。</p>
+                
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 w-full mb-10 border border-white/20 relative overflow-hidden">
+                    <div className="flex items-center space-x-3 mb-4 border-b border-white/20 pb-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl font-black border-2 border-white/50 bg-white text-green-600`}>
+                            {bookingData.pet?.name[0]}
+                        </div>
+                        <div>
+                            <p className="font-black text-lg">{bookingData.pet?.name}</p>
+                            <p className="text-white/70 text-xs">{bookingData.pet?.breed}</p>
+                        </div>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between"><span className="text-white/60">日期</span><span className="font-bold">{bookingData.date?.m}/{bookingData.date?.d} ({bookingData.date?.w})</span></div>
+                        <div className="flex justify-between"><span className="text-white/60">時間</span><span className="font-bold">{bookingData.time}</span></div>
+                        <div className="flex justify-between"><span className="text-white/60">項目</span><span className="font-bold">{bookingData.service?.name}</span></div>
+                    </div>
+                </div>
+                <button onClick={onFinish} className="w-full bg-white text-green-600 py-3 rounded-xl font-bold text-lg shadow-xl active:scale-95 transition-transform">查看預約紀錄</button>
+            </div>
+        );
+
+        // 6. 預約紀錄頁面
+        const AppointmentsScreen = ({ bookings }) => (
+            <div className="h-full flex flex-col page-enter bg-gray-50">
+                <div className="p-4 pt-8 bg-white shadow-sm z-10 text-center"><h2 className="text-lg font-black">預約紀錄</h2></div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
+                    {bookings.length === 0 ? (
+                        <div className="text-center text-gray-400 mt-20"><Icon size={48} className="mx-auto mb-4 opacity-50">{Icons.Calendar}</Icon><p>目前沒有預約紀錄</p></div>
+                    ) : (
+                        bookings.map((booking, idx) => (
+                            <div key={idx} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col animate-drop" style={{animationDelay: `${idx*0.1}s`}}>
+                                <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-50">
+                                    <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                        <Icon size={14}>{Icons.Calendar}</Icon>
+                                        <span className="font-bold">{booking.date?.m}/{booking.date?.d} ({booking.date?.w})</span>
+                                        <span className="mx-1">|</span>
+                                        <span className="font-bold text-gray-800">{booking.time}</span>
+                                    </div>
+                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${booking.status==='completed'?'bg-gray-100 text-gray-500':'bg-orange-100 text-orange-600'}`}>{booking.status==='completed'?'已完成':'即將到來'}</span>
+                                </div>
+                                <div className="flex items-start space-x-3">
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg font-black ${booking.pet?.color || 'bg-gray-200'}`}>
+                                        {booking.pet?.name[0]}
+                                    </div>
+                                    <div><h3 className="font-bold text-gray-800 text-sm">{booking.pet?.name}</h3><p className="text-xs text-gray-500">{booking.service?.name}</p></div>
+                                    <div className="flex-1 text-right mt-0.5"><span className="font-black text-base">${booking.service?.price}</span></div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        );
+
+        // 7. 新增：寵物管理列表
+        const PetManagementScreen = ({ onBack }) => {
+            return (
+                <div className="h-full flex flex-col page-enter bg-gray-50">
+                    <div className="p-4 pt-8 bg-white shadow-sm z-10 flex items-center">
+                        <button onClick={onBack} className="p-2 bg-gray-100 rounded-xl mr-3"><Icon>{Icons.ChevronLeft}</Icon></button>
+                        <h2 className="text-lg font-black">我的毛孩</h2>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
+                        {MY_PETS.map(pet => (
+                            <div key={pet.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                                <div className="flex items-center space-x-4">
+                                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl font-black ${pet.color} border-4 border-gray-50`}>
+                                        {pet.name[0]}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center space-x-2">
+                                            <h3 className="font-bold text-gray-800 text-lg">{pet.name}</h3>
+                                            <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">{pet.gender}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-400 mt-0.5">{pet.breed} · {pet.birthday}</p>
+                                    </div>
+                                </div>
+                                <button className="p-2 text-gray-300 hover:text-orange-500 transition-colors"><Icon size={20}>{Icons.Edit}</Icon></button>
+                            </div>
+                        ))}
+                        <button className="w-full py-4 rounded-2xl border-2 border-dashed border-gray-300 text-gray-400 font-bold flex items-center justify-center space-x-2 hover:bg-white hover:border-orange-300 hover:text-orange-500 transition-all">
+                            <Icon>{Icons.Plus}</Icon>
+                            <span>新增毛孩</span>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 8. 會員中心頁面 (更新，連接寵物管理)
+        const ProfileScreen = ({ onNavigate }) => (
+            <div className="h-full flex flex-col page-enter bg-gray-50">
+                <div className="bg-orange-500 text-white p-6 pb-16 rounded-b-[32px] shadow-lg relative z-10">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-lg font-bold">會員中心</h2>
+                        <button className="bg-white/20 p-2 rounded-full"><Icon size={16}>{Icons.Edit}</Icon></button>
+                    </div>
+                    <div className="flex items-center space-x-4 mb-2">
+                        <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-orange-500 shadow-md">
+                            <Icon size={28}>{Icons.User}</Icon>
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-black">{USER.name}</h1>
+                            <p className="text-xs opacity-90">{USER.level}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto pb-24 px-4 -mt-12 z-20">
+                    <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 mb-4">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">Current Level</span>
+                            <span className="text-orange-500 font-bold text-xs bg-orange-50 px-2 py-1 rounded-lg">升級進度 65%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-1.5 rounded-full mb-2 overflow-hidden">
+                            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 h-full w-[65%]"></div>
+                        </div>
+                        <p className="text-[10px] text-gray-400">再累積 {USER.nextLevel - USER.points} 點即可升級</p>
+                    </div>
+                    
+                    {/* 資產 Grid */}
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="bg-white p-3 rounded-2xl shadow-sm flex flex-col items-center"><div className="text-orange-500 mb-1"><Icon size={20}>{Icons.Plus}</Icon></div><span className="font-black text-base text-gray-800">{USER.points}</span><span className="text-[10px] text-gray-400">累積點數</span></div>
+                        <div className="bg-white p-3 rounded-2xl shadow-sm flex flex-col items-center"><div className="text-blue-500 mb-1"><Icon size={20}>{Icons.Ticket}</Icon></div><span className="font-black text-base text-gray-800">{USER.coupons}</span><span className="text-[10px] text-gray-400">優惠券</span></div>
+                        <div className="bg-white p-3 rounded-2xl shadow-sm flex flex-col items-center"><div className="text-green-500 mb-1"><Icon size={20}>{Icons.Wallet}</Icon></div><span className="font-black text-base text-gray-800">${USER.balance}</span><span className="text-[10px] text-gray-400">儲值金</span></div>
+                    </div>
+
+                    {/* 功能選單 */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                        <div onClick={() => onNavigate('pet-management')} className="flex items-center justify-between p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer">
+                            <div className="flex items-center space-x-3"><div className="p-1.5 rounded-lg bg-gray-50 text-pink-500"><Icon size={16}>{Icons.Scissors}</Icon></div><span className="font-bold text-gray-700 text-sm">寵物管理</span></div>
+                            <div className="text-gray-300"><Icon size={14}>{Icons.ChevronRight}</Icon></div>
+                        </div>
+                        <div onClick={() => onNavigate('appointments')} className="flex items-center justify-between p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer">
+                            <div className="flex items-center space-x-3"><div className="p-1.5 rounded-lg bg-gray-50 text-purple-500"><Icon size={16}>{Icons.Calendar}</Icon></div><span className="font-bold text-gray-700 text-sm">預約紀錄</span></div>
+                            <div className="text-gray-300"><Icon size={14}>{Icons.ChevronRight}</Icon></div>
+                        </div>
+                        <div className="flex items-center justify-between p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer">
+                            <div className="flex items-center space-x-3"><div className="p-1.5 rounded-lg bg-gray-50 text-green-500"><Icon size={16}>{Icons.Phone}</Icon></div><span className="font-bold text-gray-700 text-sm">聯絡客服</span></div>
+                            <div className="text-gray-300"><Icon size={14}>{Icons.ChevronRight}</Icon></div>
+                        </div>
+                        <div className="flex items-center justify-between p-3 hover:bg-gray-50 transition-colors cursor-pointer">
+                            <div className="flex items-center space-x-3"><div className="p-1.5 rounded-lg bg-gray-50 text-blue-500"><Icon size={16}>{Icons.MapPin}</Icon></div><span className="font-bold text-gray-700 text-sm">店家資訊</span></div>
+                            <div className="text-gray-300"><Icon size={14}>{Icons.ChevronRight}</Icon></div>
+                        </div>
+                    </div>
+                    <button className="w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-400 font-bold flex items-center justify-center space-x-2 hover:bg-gray-50 transition-colors text-sm"><Icon size={16}>{Icons.LogOut}</Icon><span>登出帳號</span></button>
+                </div>
+            </div>
+        );
+
+        // 底部導覽列組件
+        const BottomNav = ({ activeTab, onSwitch }) => (
+            <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 px-2 z-20 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.02)] pb-6">
+                <button onClick={() => onSwitch('home')} className={`flex flex-col items-center p-2 ${activeTab === 'home' ? 'text-orange-500' : 'text-gray-300'}`}><Icon>{Icons.Home}</Icon><span className="text-[10px] font-bold mt-1">首頁</span></button>
+                <button onClick={() => onSwitch('appointments')} className={`flex flex-col items-center p-2 ${activeTab === 'appointments' ? 'text-orange-500' : 'text-gray-300'}`}><Icon>{Icons.List}</Icon><span className="text-[10px] font-bold mt-1">預約紀錄</span></button>
+                <button onClick={() => onSwitch('mine')} className={`flex flex-col items-center p-2 ${activeTab === 'mine' ? 'text-orange-500' : 'text-gray-300'}`}><Icon>{Icons.User}</Icon><span className="text-[10px] font-bold mt-1">我的</span></button>
+            </div>
+        );
+
+        function App() {
+            const [mainTab, setMainTab] = useState('home'); 
+            const [bookingStep, setBookingStep] = useState(null); // 'pet-management' is handled as a step within mainTab logic or as a modal? Let's use step for cleaner overlay
+            const [bookingData, setBookingData] = useState({});
+            const [myBookings, setMyBookings] = useState([
+                { date: { m: 12, d: 28, w: '日' }, time: '14:00', pet: MY_PETS[0], service: SERVICES[0], status: 'upcoming' },
+                { date: { m: 11, d: 20, w: '一' }, time: '10:00', pet: MY_PETS[0], service: SERVICES[1], status: 'completed' }
+            ]);
+
+            const updateBooking = (data) => setBookingData(prev => ({ ...prev, ...data }));
+            const startBooking = (date) => { setBookingData({ date }); setBookingStep('time'); };
+            const cancelBooking = () => { setBookingStep(null); setBookingData({}); };
+            const finishBooking = () => {
+                setMyBookings([ { ...bookingData, status: 'upcoming' }, ...myBookings ]);
+                setBookingStep(null);
+                setBookingData({});
+                setMainTab('appointments'); 
+            };
+
+            // Navigation handler for Profile page items
+            const handleProfileNavigate = (target) => {
+                if (target === 'appointments') {
+                    setMainTab('appointments');
+                } else if (target === 'pet-management') {
+                    setBookingStep('pet-management'); // Reuse step state for fullscreen overlay
+                }
+            };
+
+            return (
+                <>
+                    {bookingStep === null && (
+                        <>
+                            {mainTab === 'home' && <HomeScreen onDateSelect={startBooking} />}
+                            {mainTab === 'appointments' && <AppointmentsScreen bookings={myBookings} />}
+                            {mainTab === 'mine' && <ProfileScreen onNavigate={handleProfileNavigate} />}
+                            <BottomNav activeTab={mainTab} onSwitch={setMainTab} />
+                        </>
+                    )}
+                    
+                    {/* Fullscreen Overlays / Booking Steps */}
+                    {bookingStep === 'time' && <SelectTimeScreen date={bookingData.date} onBack={cancelBooking} onClose={cancelBooking} onNext={(data) => { updateBooking(data); setBookingStep('pet'); }} />}
+                    {bookingStep === 'pet' && <SelectPetScreen onBack={() => setBookingStep('time')} onClose={cancelBooking} onNext={(data) => { updateBooking(data); setBookingStep('service'); }} />}
+                    {bookingStep === 'service' && <SelectServiceScreen onBack={() => setBookingStep('pet')} onClose={cancelBooking} onNext={(data) => { updateBooking(data); setBookingStep('success'); }} />}
+                    {bookingStep === 'success' && <SuccessScreen onFinish={finishBooking} bookingData={bookingData} />}
+                    
+                    {/* Pet Management Overlay */}
+                    {bookingStep === 'pet-management' && <PetManagementScreen onBack={() => setBookingStep(null)} />}
+                </>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
